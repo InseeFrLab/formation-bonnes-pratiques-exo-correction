@@ -3,7 +3,11 @@
 library(dplyr)
 library(ggplot2)
 
-api_token <- "trotskitueleski$1917"
+
+api_token <- Sys.getenv("JETON_API")
+if (api_token == ""){
+  api_token <- rstudioapi::askForPassword("Renseigner le jeton d'API")
+}
 
 
 # FONCTIONS ==================================

@@ -1,4 +1,5 @@
 individu_reg.*
+.Renviron
 
 # History files
 .Rhistory
