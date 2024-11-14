@@ -3,6 +3,7 @@
 library(dplyr)
 library(ggplot2)
 
+source("R/functions.R", encoding = "UTF-8")
 
 api_token <- Sys.getenv("JETON_API")
 if (api_token == ""){
@@ -10,48 +11,6 @@ if (api_token == ""){
 }
 
 
-# FONCTIONS ==================================
-
-decennie_a_partir_annee <- function(annee) return(annee - annee %% 10)
-
-#' Fonction de Statistique Agrégée
-#'
-#' Calcule une statistique agrégée (moyenne, écart-type ou variance) pour un vecteur numérique donné.
-#'
-#' @param a Un vecteur numérique de valeurs pour lequel la statistique agrégée sera calculée.
-#' @param b Une chaîne de caractères spécifiant le type de statistique à calculer. Options possibles :
-#'   \itemize{
-#'     \item `"moyenne"` : Calcule la moyenne (par défaut).
-#'     \item `"ecart-type"` ou `"sd"` : Calcule l'écart-type.
-#'     \item `"variance"` : Calcule la variance.
-#'   }
-#' @param ... Arguments supplémentaires passés aux fonctions sous-jacentes (par exemple, `mean`, `sd`, `var`).
-#'
-#' @return Une valeur numérique représentant la statistique calculée.
-#'
-#' @examples
-#' # Calculer la moyenne d'un vecteur normal aléatoire
-#' fonction_de_stat_agregee(rnorm(10))
-#'
-#' # Calculer l'écart-type d'un vecteur normal aléatoire
-#' fonction_de_stat_agregee(rnorm(10), "ecart-type")
-#'
-#' # Calculer la variance d'un vecteur normal aléatoire
-#' fonction_de_stat_agregee(rnorm(10), "variance")
-#'
-#' @export
-fonction_de_stat_agregee <- function(a, b = "moyenne", ...) {
-  
-  if (b == "moyenne") {
-    x <- mean(a, na.rm = TRUE, ...)
-  } else if (b == "ecart-type" || b == "sd") {
-    x <- sd(a, na.rm = TRUE, ...)
-  } else if (b == "variance") {
-    x <- var(a, na.rm = TRUE, ...)
-  }
-  return(x)
-  
-}
 
 
 # IMPORT --------------------------------------------
@@ -93,8 +52,12 @@ part_hommes_cohortes <- df %>%
 
 # STATISTIQUES UNIVARIEES ============================
 
-fonction_de_stat_agregee(df %>% filter(sexe == "Homme") %>% pull(aged))
-fonction_de_stat_agregee(df %>% filter(sexe == "Femme") %>% pull(aged))
+stats_desc_variable(
+  df %>% filter(sexe == "Homme") %>% pull(aged)
+)
+stats_desc_variable(
+  df %>% filter(sexe == "Femme") %>% pull(aged)
+)
 
 
 # DISTRIBUTION D'AGE =================================
@@ -110,7 +73,7 @@ p <- part_hommes_cohortes %>%
   coord_cartesian(c(0, 100))
 
 p
-ggsave("p.png", p)
+ggsave("output/part_hommes_cohortes.png", p)
 
 
 
