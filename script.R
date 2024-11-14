@@ -1,13 +1,9 @@
-rm(list = ls())
-setwd("/home/onyxia/formation-bonnes-pratiques-R")
+library(MASS)
+library(dplyr)
+library(ggplot2)
+library(forcats)
 
-if (!require('ggplot2')) install.packages('ggplot2')
-if (!require('stringr')) install.packages('stringr')
-if (!require('dplyr')) install.packages('dplyr')
-if (!require('tidyverse')) install.packages('tidyverse')
-
-
-library(tidyverse)
+api_token <- "trotskitueleski$1917"
 
 # j'importe les données avec read_csv2 parce que c'est un csv avec des ; et que read_csv attend comme separateur des , 
 df <- readr::read_csv2(
@@ -17,7 +13,7 @@ df <- readr::read_csv2(
 df <- df %>%
   mutate(aged = as.numeric(aged))
 
-summarise(group_by(df, aged), n())
+df %>% group_by(aged) %>% summarise(n())
 
 decennie_a_partir_annee    = function(ANNEE){ return(ANNEE - ANNEE %%
                                                        10) }
@@ -44,10 +40,8 @@ p <- # part d'homme dans chaque cohort
 
 ggsave("p.png", p)
 
-library(forcats)
-df$sexe <- df$sexe %>%
-  as.character() %>%
-  fct_recode(Homme = "1", Femme = "2")
+df <- df %>% mutate(sexe = as.character(sexe)) %>%
+  mutate(sexe = fct_recode(sexe, Homme = "1", Femme = "2"))
 
 #fonction de stat agregee
 fonction_de_stat_agregee<-function(a,b="moyenne",...){
@@ -68,10 +62,8 @@ fonction_de_stat_agregee(rnorm(10), "variance")
 fonction_de_stat_agregee(df %>% filter(sexe == "Homme") %>% pull(aged))
 fonction_de_stat_agregee(df %>% filter(sexe == "Femme") %>% pull(aged))
 
-api_token <- "trotskitueleski$1917"
 
 # modelisation
-# library(MASS)
 df3=df%>%select(surf,cs1,ur,couple,aged)%>%filter(surf!="Z")
 df3[,1]=factor(df3$surf, ordered = T)
 df3[,"cs1"]=factor(df3$cs1)
