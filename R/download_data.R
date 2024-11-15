@@ -1,9 +1,47 @@
-df <- 
-  aws.s3::s3read_using(
-    FUN = readr::read_csv2,
-    object = "diffusion/bonnes-pratiques-r/rp_2016_individu_sample.csv",
-    bucket = "projet-formation",
-    opts = list("region" = "")
-  )
+library(dplyr)
+library(arrow)
 
-readr::write_csv2(df, "individu_reg.csv")
+options(timeout = max(300, getOption("timeout")))
+
+# FUNCTIONS ---------------------------------------------
+
+download_if_not_exists <- function(url, filename) {
+  if (!file.exists(filename)) {
+    download.file(url, filename)
+    message(paste("Downloaded:", filename))
+  } else {
+    message(paste("File already exists:", filename))
+  }
+}
+
+dir.create("data")
+
+url_table_individu <- "https://static.data.gouv.fr/resources/recensement-de-la-population-fichiers-detail-individus-localises-au-canton-ou-ville-2020-1/20231023-122841/fd-indcvi-2020.parquet"
+filename_table_individu <- "data/RPindividus.parquet"
+
+
+# MAIN ---------------------------------------------------
+
+# Télécharge les fichiers
+download_if_not_exists(url_table_individu, filename_table_individu)
+
+
+# ALTERNATIVE EN CSV POUR LES BENCHMARKS -------------------------
+
+rp <- arrow::open_dataset(filename_table_individu)
+
+#/!\ ne pas ecrire le fichier sans ce filtre en csv,
+# vous allez dépasser la taille du disque sinon
+rp24 <- rp %>%
+  filter(REGION == "24")
+
+
+readr::write_csv(
+  rp24 %>% collect() %>% as_tibble(),
+  "data/RPindividus_24.csv"
+)
+
+write_parquet(rp24, "data/RPindividus_24.parquet")
+
+
+
