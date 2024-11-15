@@ -1,5 +1,6 @@
 library(dplyr)
 library(arrow)
+library(s3fs)
 
 options(timeout = max(300, getOption("timeout")))
 
@@ -43,6 +44,9 @@ readr::write_csv(
 
 write_parquet(rp24, "data/RPindividus_24.parquet")
 
+system("mc cp projet-formation/bonnes-pratiques/data/RPindividus.csv data/RPindividus.csv")
+
+# Pour info, le CSV du RP complet a été créé de cette manière:
 # readr::write_csv(
 #   rp %>% collect() %>% as_tibble(),
 #   "data/RPindividus.csv"

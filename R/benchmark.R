@@ -4,10 +4,10 @@ library(DBI)
 library(arrow)
 library(dplyr)
 library(glue)
-library(tictoc)
 library(gt)
 library(gtExtras)
 
+source("R/benchmark_functions.R")
 
 # PARAMETERS --------------------------------------------
 
@@ -31,6 +31,12 @@ disk_usage_sample_parquet <- file_size(filename_sample_parquet)
 disk_usage_full_parquet <- file_size(filename_full_parquet)
 disk_usage_full_csv <- file_size(filename_full_csv)
 
+disk_usage <- list(
+  sample_csv = disk_usage_sample_csv,
+  sample_parquet = disk_usage_sample_parquet,
+  full_parquet = disk_usage_full_parquet,
+  full_csv = disk_usage_full_csv
+)
 
 # IMPORT TIME --------------------------------------------------
 
@@ -107,13 +113,6 @@ dims_sample <- sample %>% dim()
 # ON MET TOUT ENSEMBLE ------------------------------------------------
 
 
-disk_usage <- list(
-  sample_csv = disk_usage_sample_csv,
-  sample_parquet = disk_usage_sample_parquet,
-  full_parquet = disk_usage_full_parquet,
-  full_csv = disk_usage_full_csv
-)
-
 timings <- list(
   csv_sample = diff_time_csv,
   csv_sample_subset = diff_time_csv_subset,
@@ -140,65 +139,5 @@ create_report_table(results_df)
 
 
 
-# COMPRENDRE AVEC EXPLAIN ANALYZE --------------
-
-url_table_individu <- "https://static.data.gouv.fr/resources/recensement-de-la-population-fichiers-detail-individus-localises-au-canton-ou-ville-2020-1/20231023-122841/fd-indcvi-2020.parquet"
-
-con <- dbConnect(duckdb())
-
-dbExecute(
-  con,
-  glue(
-    "INSTALL httpfs;",
-    "LOAD httpfs;"
-  )
-)
-
-
-
-plan_base_complete <- dbGetQuery(con,
-           glue(  
-             'EXPLAIN ANALYZE ',
-             'SELECT * FROM read_parquet("{url_table_individu}")'
-           )
-)
-
-plan_peu_de_lignes <- dbGetQuery(
-  con,
-  glue(  
-    'EXPLAIN ANALYZE ',
-    'SELECT * FROM read_parquet("{url_table_individu}") WHERE REGION = \'24\''
-  )
-)
-plan_peu_de_lignes
-
-
-columns_concat <- paste(columns_subset, collapse = ", ")
-plan_peu_de_colonnes <- dbGetQuery(
-  con,
-  glue(  
-    'EXPLAIN ANALYZE ',
-    'SELECT ({columns_concat}) FROM read_parquet("{url_table_individu}")'
-  )
-)
-
-
-capture_parquet_need <- function(string){
-  capture <- stringr::str_extract(
-    string, "in:\\s*[0-9.]+\\s*[A-Za-z]+"
-  )
-  return(capture)
-}
-
-
-capture_parquet_need(
-  plan_peu_de_lignes$explain_value
-)
-capture_parquet_need(
-  plan_peu_de_colonnes$explain_value
-)
-
-# conclusion: duckdb optimise d'abord les colonnes puis fait un filtre sur les lignes: comment faire un filtre sur les lignes en amont ? 
-# solution: parquet partitionné
 
 
