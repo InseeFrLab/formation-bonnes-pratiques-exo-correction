@@ -1,3 +1,13 @@
+library(fs)
+library(readr)
+library(arrow)
+library(dplyr)
+library(glue)
+library(gt)
+library(gtExtras)
+
+
+
 file_size <- function(file_path) {
   size_in_bytes <- file.info(file_path)$size
   return(
