@@ -53,12 +53,8 @@ capture_parquet_need <- function(string){
 }
 
 
-capture_parquet_need(
-  plan_peu_de_lignes$explain_value
-)
-capture_parquet_need(
-  plan_peu_de_colonnes$explain_value
-)
+plan_peu_de_lignes
+plan_peu_de_colonnes
 
 # conclusion: duckdb optimise d'abord les colonnes puis fait un filtre sur les lignes: comment faire un filtre sur les lignes en amont ? 
 # solution: parquet partitionné
