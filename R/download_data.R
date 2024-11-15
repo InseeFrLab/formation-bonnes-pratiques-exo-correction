@@ -43,5 +43,9 @@ readr::write_csv(
 
 write_parquet(rp24, "data/RPindividus_24.parquet")
 
+readr::write_csv(
+  rp %>% collect() %>% as_tibble(),
+  "data/RPindividus.csv"
+)
 
 

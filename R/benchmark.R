@@ -17,6 +17,7 @@ columns_subset <- toupper(columns_subset)
 filename_sample_csv <- "data/RPindividus_24.csv"
 filename_sample_parquet <- gsub("csv", "parquet", filename_sample_csv)
 filename_full_parquet <- gsub("_24", "", filename_sample_parquet)
+filename_full_csv <- gsub("parquet", "csv", filename_sample_parquet)
 
 
 # FUNCTIONS --------------------------------------------
@@ -64,6 +65,7 @@ import_time_parquet <- function(path, col_names = NULL) {
 disk_usage_sample_csv <- file_size(filename_sample_csv)
 disk_usage_sample_parquet <- file_size(filename_sample_parquet)
 disk_usage_full_parquet <- file_size(filename_full_parquet)
+disk_usage_full_csv <- file_size(filename_full_csv)
 
 
 # IMPORT TIME --------------------------------------------------
@@ -83,6 +85,14 @@ diff_time_parquet_subset <- import_time_parquet(
 diff_time_parquet_full <- import_time_parquet(filename_full_parquet)
 diff_time_parquet_full_sample <- import_time_parquet(
   filename_full_parquet,
+  col_names = columns_subset
+)
+
+# CSV (FULL): WITH AND WITHOUT COLUMN CONDITIONING ===============
+diff_time_parquet_csv <- import_time_csv(filename_full_csv, readr::read_csv)
+diff_time_parquet_full_sample <- import_time_csv(
+  filename_full_csv,
+  readr::read_csv,
   col_names = columns_subset
 )
 
