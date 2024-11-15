@@ -1,64 +1,28 @@
 library(fs)
-library(tictoc)
 library(profvis)
 library(DBI)
-library(duckdb)
+library(arrow)
+library(dplyr)
+library(glue)
+library(tictoc)
 library(gt)
+library(gtExtras)
+
 
 # PARAMETERS --------------------------------------------
 
+
 columns_subset <- c(
-  "region", "aged", "anai", "catl",
-  "couple",
-   "sexe", "surf", "tp", "trans"
+  "REGION", "AGED", "ANAI", "CATL", "COUPLE",
+  "SEXE", "SURF", "TP", "TRANS"
 )
-columns_subset <- toupper(columns_subset)
 
 filename_sample_csv <- "data/RPindividus_24.csv"
 filename_sample_parquet <- gsub("csv", "parquet", filename_sample_csv)
 filename_full_parquet <- gsub("_24", "", filename_sample_parquet)
-filename_full_csv <- gsub("parquet", "csv", filename_sample_parquet)
+filename_full_csv <- gsub("parquet", "csv", filename_full_parquet)
 
 
-# FUNCTIONS --------------------------------------------
-
-
-file_size <- function(file_path) {
-  size_in_bytes <- file.info(file_path)$size
-  return(
-    fs::fs_bytes(size_in_bytes)
-  )
-}
-
-import_time_csv <- function(path, import_fun = .f, ...) {
-
-  start_time <- Sys.time()
-  csv_data <- import_fun(path, ...)
-  end_time <- Sys.time()
-  diff_time <- end_time - start_time
-  
-  return(diff_time)
-
-}
-
-import_time_parquet <- function(path, col_names = NULL) {
-  
-  start_time <- Sys.time()
-  parquet_data <- open_dataset(path)
-  
-  if (!is.null(col_names)){
-    parquet_data <- parquet_data %>%
-      select(any_of(col_names))
-  }
-  
-  parquet_data <- parquet_data %>% collect()
-  
-  end_time <- Sys.time()
-  diff_time <- end_time - start_time
-  
-  return(diff_time)
-  
-}
 
 # DISK FILESIZE ------------------------------------------------
 
@@ -72,7 +36,9 @@ disk_usage_full_csv <- file_size(filename_full_csv)
 
 # CSV (SAMPLE): WITH AND WITHOUT COLUMN CONDITIONING ====================
 diff_time_csv <- import_time_csv(filename_sample_csv, readr::read_csv)
-diff_time_csv_subset <- import_time(filename_sample_csv, readr::read_csv, col_names = columns_subset)
+diff_time_csv_subset <- import_time_csv(
+  filename_sample_csv, readr::read_csv, col_names = columns_subset
+)
 
 # PARQUET (SAMPLE): WITH AND WITHOUT COLUMN CONDITIONING ===============
 diff_time_parquet <- import_time_parquet(filename_sample_parquet)  
@@ -89,16 +55,11 @@ diff_time_parquet_full_sample <- import_time_parquet(
 )
 
 # CSV (FULL): WITH AND WITHOUT COLUMN CONDITIONING ===============
-diff_time_parquet_csv <- import_time_csv(filename_full_csv, readr::read_csv)
-diff_time_parquet_full_sample <- import_time_csv(
-  filename_full_csv,
-  readr::read_csv,
-  col_names = columns_subset
-)
+# /!\ ne faire tourner qu'une fois, c'est loooooooooooong 
+diff_time_csv_full <- import_time_csv(filename_full_csv, readr::read_csv)
 
 
 # PROFILING: VISUALISING TIME SPENT ON DIFFERENT OPERATIONS ----------------------
-
 
 # CSV (SAMPLE): WITH AND WITHOUT COLUMN CONDITIONING ====================
 profvis(readr::read_csv(filename_sample_csv), interval = .005)
@@ -136,77 +97,47 @@ profvis(
 # DIMENSIONS ---------------------------------------------------------
 
 complete <- open_dataset(filename_full_parquet) %>% collect()
-sample <- open_dataset(filename_sample_parquet) %>% collect()
+sample <- open_dataset(filename_sample_parquet) %>%
+  select(any_of(columns_subset)) %>% collect()
 
-cols_complete %>%
+dims_complete <- complete %>% dim()
+dims_sample <- sample %>% dim()
+
 
 # ON MET TOUT ENSEMBLE ------------------------------------------------
 
-# Création du dataframe avec une troisième colonne pour indiquer l'échantillon
-results_df <- data.frame(
-  format = rep(
-    c(
-      "CSV 🐢", 
-      "Parquet 🐎", 
-      "Parquet 🐎"
-    ), 
-    each = 2
-  ),
-  cols = rep(
-    c("Toutes les colonnes", "Sous-ensemble de colonnes"),
-    times = 3
-  ),
-  disk = rep(
-    c(
-      as.numeric(gsub("M", "", disk_usage_sample_csv)),
-      as.numeric(gsub("M", "", disk_usage_sample_parquet)),
-      as.numeric(gsub("M", "", disk_usage_full_parquet))
-    ), 
-    each = 2
-  ),
-  import = c(
-    as.numeric(diff_time_csv),
-    as.numeric(diff_time_csv_subset),
-    as.numeric(diff_time_parquet),
-    as.numeric(diff_time_parquet_subset),
-    as.numeric(diff_time_parquet_full),
-    as.numeric(diff_time_parquet_full_sample)
-  ),
-  sample = c(
-    rep("✔️", 4),
-    "❌️", "❌️")
 
+disk_usage <- list(
+  sample_csv = disk_usage_sample_csv,
+  sample_parquet = disk_usage_sample_parquet,
+  full_parquet = disk_usage_full_parquet,
+  full_csv = disk_usage_full_csv
 )
 
-results_df <- results_df %>%
-  mutate(import_bar = import, disk_bar = disk) %>%
-  select(order(colnames(.))) %>%
-  select(format, cols, sample, everything())
+timings <- list(
+  csv_sample = diff_time_csv,
+  csv_sample_subset = diff_time_csv_subset,
+  parquet_sample = diff_time_parquet,
+  parquet_sample_subset = diff_time_parquet_subset,
+  parquet_full = diff_time_parquet_full,
+  parquet_full_subset = diff_time_parquet_full_sample,
+  csv_full = diff_time_csv_full
+)
 
-gt(
-  results_df
-  ) %>%
-  fmt_markdown(columns = 'sample') %>%
-  fmt_number(columns = "import", decimals = 2) %>%
-  fmt_number(columns = "disk", decimals = 0) %>%
-  gtExtras::gt_plt_bar(
-    column = import_bar
-  ) %>%
-  gtExtras::gt_plt_bar(
-    column = disk_bar
-  ) %>%
-  tab_spanner(label = md("Configuration"), columns = c("cols", "sample") ) %>%
-  tab_spanner(label = md("Taille sur disque _(MiB)_"), columns = starts_with("disk")) %>%
-  tab_spanner(label = md("Vitesse à l'import _(sec)_"), columns = starts_with("import")) %>%
-  cols_label(
-    format = "Format du fichier",
-    cols = "Colonnes",
-    sample = "Echantillon de données ?",
-    disk = "",
-    import = "",
-    ends_with("_bar") ~ "",
-    .fn = md
-  )
+dimensions <- list(
+  complete = dims_complete,
+  sample = dims_sample
+)
+
+
+results_df <- create_results_df(disk_usage, timings, dimensions)
+
+create_report_table(results_df)
+
+
+
+
+
 
 
 # COMPRENDRE AVEC EXPLAIN ANALYZE --------------
