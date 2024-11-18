@@ -15,6 +15,7 @@ file_size <- function(file_path) {
   )
 }
 
+
 import_time_csv <- function(path, import_fun = .f, ...) {
   
   start_time <- Sys.time()
@@ -46,24 +47,50 @@ import_time_parquet <- function(path, col_names = NULL) {
 }
 
 
+import_time_parquet_partioned <- function(
+    path = "./data/RPindividus.parquet",
+    col_names = NULL
+){
+  
+  start <- Sys.time()
+  
+  parquet_data <- open_dataset(
+    path,
+    hive_style = TRUE,
+  ) %>%
+    filter(region == "24")
+  
+  if (!is.null(col_names)){
+    parquet_data <- parquet_data %>%
+      select(any_of(col_names))
+  }
+  
+  parquet_data <- parquet_data %>% collect()
+  diff_time <- Sys.time() - start
+  
+  return(diff_time)
+  
+}
 
 
 create_results_df <- function(disk_usage, timings, dimensions) {
+  
   results_df <- data.frame(
     format = c(
-      rep(c("CSV", "Parquet", "Parquet"), each = 2),
+      rep(c("CSV", "Parquet", "Parquet", "Parquet partitionné"), each = 2),
       "CSV"
     ),
     cols = c(
-      rep(c("Toutes", "Sous-ensemble"), times = 3),
+      rep(c("Toutes", "Sous-ensemble"), times = 4),
       "Toutes"
     ),
     cols_number = c(
-      rep(c(dimensions$complete[2], dimensions$sample[2]), 3),
+      rep(c(dimensions$complete[2], dimensions$sample[2]), 4),
       dimensions$complete[2]
     ),
     rows_number = c(
       rep(c(dimensions$complete[1], dimensions$sample[1]), 3),
+      rep(dimensions$sample[1], 2),
       dimensions$complete[1]
     ),
     disk = c(
@@ -72,23 +99,41 @@ create_results_df <- function(disk_usage, timings, dimensions) {
         disk_usage$sample_parquet, 
         disk_usage$full_parquet
       ), each = 2),
+      rep(disk_usage$full_parquet, 2),
       disk_usage$full_csv
     ),
-    import = c(
-      as.numeric(timings$csv_sample),
-      as.numeric(timings$csv_sample_subset),
-      as.numeric(timings$parquet_sample),
-      as.numeric(timings$parquet_sample_subset),
-      as.numeric(timings$parquet_full),
-      as.numeric(timings$parquet_full_subset),
-      as.numeric(timings$csv_full, units = "secs")
-    ),
+    import = as.numeric(
+      c(
+        timings$csv_sample,
+        timings$csv_sample_subset,
+        timings$parquet_sample,
+        timings$parquet_sample_subset,
+        timings$parquet_full,
+        timings$parquet_full_subset,
+        timings$parquet_partitioned_full,
+        timings$parquet_partitioned_full_subset,
+        timings$csv_full
+      ),
+      units = "secs"),
     sample = c(
       rep(TRUE, 4),
-      rep(FALSE, 3)
+      rep(FALSE, 2),
+      rep(TRUE, 2),
+      FALSE
     )
   )
   
+  results_df <- results_df %>%
+    mutate(
+      partitioned = case_when(
+        (sample) & (grepl("partitionné", format)) ~ "✅️",
+        (sample) & (format != "CSV" ) ~ "❌️",
+        TRUE ~ ""
+      )
+    ) %>%
+    mutate(
+      format = gsub(" partitionné", "", format)
+    )
   
   results_df <- results_df %>%
     mutate(disk = fs::fs_bytes(disk)) %>%
@@ -101,11 +146,16 @@ create_results_df <- function(disk_usage, timings, dimensions) {
     select(order(colnames(.))) %>%
     mutate(cols = glue("_{cols}_ (**{cols_number}** colonnes)")) %>%
     mutate(emo = if_else(format == "Parquet", "🐎", "🐢")) %>%
-    select(emo, format, cols, sample, starts_with("rows_"), starts_with("cols_"), everything()) %>%
-    arrange(desc(sample), format, desc(cols))
+    select(
+      emo, format, partitioned, cols, sample,
+      starts_with("rows_"),
+      starts_with("cols_"),
+      everything()
+    ) %>%
+    arrange(desc(sample), desc(cols), format)
   
   return(results_df)
-
+  
   
 }
 
@@ -137,13 +187,14 @@ create_report_table <- function(df){
     ) %>%
     tab_spanner(
       label = md("**Configuration**"),
-      columns = c("emo", "format", "cols", "sample", starts_with("cols_"), starts_with("rows_"))
+      columns = c("emo", "format", "partitioned", "cols", "sample", starts_with("cols_"), starts_with("rows_"))
     ) %>%
     tab_spanner(label = md("**Taille sur disque**<br>_(MiB ou GiB)_"), columns = starts_with("disk")) %>%
     tab_spanner(label = md("**Vitesse à l'import**<br>_(secondes)_"), columns = starts_with("import")) %>%
     cols_label(
       emo = "",
       format = "*Format du fichier*",
+      partitioned = "*Partitionné?*",
       cols = "*Colonnes*",
       sample = "*Echantillon de données ?*",
       disk = "",
@@ -153,7 +204,7 @@ create_report_table <- function(df){
     ) %>%
     tab_row_group(
       label = md(
-        glue("**Seulement la Normandie ({nrows} observations)**", nrows = format(dims_sample[1], big.mark=" "))
+        glue("**Seulement le Centre Val de Loire ({nrows} observations)**", nrows = format(dims_sample[1], big.mark=" "))
       ),
       rows = (sample == TRUE),
       id = "sample"
@@ -168,11 +219,33 @@ create_report_table <- function(df){
     tab_style(
       style = list(
         cell_fill(color = "#4758AB"),
-        cell_text(color = "white")      
+        cell_text(color = "white")
       ),
       locations = cells_row_groups()
+    ) %>%
+    tab_style(
+      style = list(
+        cell_borders(
+          sides = c("top"),
+          color = "#4758AB",
+          weight = px(2)
+        )
+      ),
+      locations = list(
+        cells_body(
+          rows = (format == "CSV" & cols != " _Toutes_ (**88** colonnes)")
+        )
+      )
+    ) %>%
+    tab_footnote(
+      footnote = md("Poids de l'ensemble des données, y compris régions différentes"),
+      locations = cells_body(
+        rows = (format == "Parquet" & partitioned == "✅️"),
+        columns = "disk"
+      )
     )
-  
+
   return(tab)
-  
+
 }
+

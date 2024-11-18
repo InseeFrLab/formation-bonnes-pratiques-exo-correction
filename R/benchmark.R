@@ -23,6 +23,12 @@ filename_full_parquet <- gsub("_24", "", filename_sample_parquet)
 filename_full_csv <- gsub("parquet", "csv", filename_full_parquet)
 
 
+# WRITE PARQUET PARTIONED IF NECESSARY
+unlink("./data/RPindividus")
+rp <- open_dataset(filename_full_parquet) %>%
+  group_by(REGION) %>%
+  write_dataset("./data/RPindividus")
+
 
 # DISK FILESIZE ------------------------------------------------
 
@@ -63,6 +69,14 @@ diff_time_parquet_full_sample <- import_time_parquet(
 # CSV (FULL): WITH AND WITHOUT COLUMN CONDITIONING ===============
 # /!\ ne faire tourner qu'une fois, c'est loooooooooooong 
 diff_time_csv_full <- import_time_csv(filename_full_csv, readr::read_csv)
+
+# PARTITIONNED PARQUET: WITH AND WITHOUT COLUMN CONDITIONING ===============
+diff_time_parquet_partioned <- import_time_parquet_partioned(filename_full_parquet)
+diff_time_parquet_partioned_sample <- import_time_parquet(
+  filename_full_parquet,
+  col_names = columns_subset
+)
+
 
 
 # PROFILING: VISUALISING TIME SPENT ON DIFFERENT OPERATIONS ----------------------
@@ -120,6 +134,8 @@ timings <- list(
   parquet_sample_subset = diff_time_parquet_subset,
   parquet_full = diff_time_parquet_full,
   parquet_full_subset = diff_time_parquet_full_sample,
+  parquet_partitioned_full = diff_time_parquet_partioned,
+  parquet_partitioned_full_subset = diff_time_parquet_partioned_sample,
   csv_full = diff_time_csv_full
 )
 

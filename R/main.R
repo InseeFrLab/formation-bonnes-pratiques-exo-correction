@@ -1,5 +1,6 @@
 # ENVIRONNEMENT -------------------------------
 
+library(arrow)
 library(dplyr)
 library(ggplot2)
 
@@ -11,18 +12,25 @@ if (api_token == ""){
 }
 
 
-
-
 # IMPORT --------------------------------------------
 
-df <- readr::read_csv2(
-  "individu_reg.csv",
-  col_select = c(
-    "region", "aemm", "aged", "anai", "catl",
-    "cs1", "cs2", "cs3", "couple", "na38", "naf08",
-    "pnai12", "sexe", "surf", "tp", "trans", "ur"
-  )
+columns_subset <- c(
+  "REGION", "AGED", "ANAI", "CATL", "COUPLE",
+  "SEXE", "SURF", "TP", "TRANS"
 )
+
+
+df <- open_dataset(
+  "./data/RPindividus",
+  hive_style = TRUE
+) %>%
+  filter(REGION == 24) %>%
+  select(any_of(columns_subset)) %>%
+  collect()
+
+df <- df %>%
+  rename_with(tolower) %>%
+  as_tibble()
 
 
 # NETTOYAGES --------------------------------------------
@@ -45,7 +53,7 @@ part_hommes_cohortes <- df %>%
   summarise(SH_sexe = n()) %>%
   group_by(aged) %>%
   mutate(SH_sexe = SH_sexe / sum(SH_sexe)) %>%
-  filter(sexe == 1)
+  filter(sexe == "Homme")
 
 
 # STATISTIQUES DESCRIPTIVES ------------------------------
@@ -62,10 +70,6 @@ stats_desc_variable(
 
 # DISTRIBUTION D'AGE =================================
 
-ggplot(df) +
-  geom_histogram(aes(x = 5 * floor(as.numeric(aged) / 5)), stat = "count")
-
-
 p <- part_hommes_cohortes %>%
   ggplot() +
   geom_bar(aes(x = aged, y = SH_sexe), stat = "identity") +
@@ -77,12 +81,10 @@ ggsave("output/part_hommes_cohortes.png", p)
 
 
 
-
 # MODELISATION ----------------------------------------
 
 echantillon_modelisation <- df %>%
-  select(surf, cs1, ur, couple, aged) %>%
   filter(surf != "Z") %>%
-  mutate(surf = factor(surf, ordered = TRUE), cs1 = factor(cs1))
+  sample_n(1000)
 
-MASS::polr(surf ~ cs1 + factor(ur), echantillon_modelisation)
+MASS::polr(surf ~ couple + sexe, echantillon_modelisation)
