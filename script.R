@@ -5,35 +5,14 @@ library(forcats)
 
 api_token <- Sys.getenv("JETON_API")
 
-
-# FUNCTIONS -----------------------------------------------
-
-decennie_a_partir_annee <- function(annee) {
-  return(annee - annee %% 10)
-}
-
-fonction_de_stat_agregee <- function(a, b = "moyenne", ...) {
-  if (b == "moyenne") {
-    x <- mean(a, na.rm = TRUE, ...)
-  } else if (b == "ecart-type" || b == "sd") {
-    x <- sd(a, na.rm = TRUE, ...)
-  } else if (b == "variance") {
-    x <- var(a, na.rm = TRUE, ...)
-  }
-  return(x)
-}
-
-fonction_de_stat_agregee(rnorm(10))
-fonction_de_stat_agregee(rnorm(10), "ecart-type")
-fonction_de_stat_agregee(rnorm(10), "variance")
-
+source("R/functions.R", encoding = "UTF-8")
 
 
 # IMPORT ET STRUCTURATION DONNEES -------------
 
 
 df <- readr::read_csv(
-  "RPindividus_24.csv",
+  "data/RPindividus_24.csv",
   col_select = c(
     "REGION", "AGED", "ANAI", "CATL", "COUPLE",
     "SEXE", "SURF", "TP", "TRANS", "IPONDI"
@@ -68,12 +47,14 @@ ggplot(df) +
 
 # STATS MODALITES DE TRANSPORT ===============
 
+
 transport_par_statut_couple <- df %>%
   group_by(COUPLE, TRANS) %>%
   summarise(x = sum(IPONDI)) %>%
   group_by(COUPLE) %>%
   mutate(y = 100 * x / sum(x))
 transport_par_statut_couple
+
 
 # PART HOMMES DANS CHAQUE COHORTE ============================
 
@@ -93,7 +74,7 @@ p <- ggplot(part_hommes_chaque_cohorte) +
   coord_cartesian(c(0, 100))
 
 
-ggsave("p.png", p)
+ggsave("output/p.png", p)
 
 
 # MODELISATION --------------------------------
