@@ -1,5 +1,6 @@
 RPindividus*
 .Renviron
+output/
 
 # History files
 .Rhistory
