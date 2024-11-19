@@ -2,7 +2,8 @@ library(dplyr)
 library(ggplot2)
 library(forcats)
 
-api_token <- "trotskitueleski$1917"
+
+api_token <- Sys.getenv("JETON_API")
 
 
 # FUNCTIONS -----------------------------------------------
@@ -45,34 +46,36 @@ df <- df %>%
   mutate(SEXE = fct_recode(SEXE, Homme = "1", Femme = "2"))
 
 
+
+# STATISTIQUES AGREGEES ---------------------------------------
+
 fonction_de_stat_agregee(df %>% filter(SEXE == "Homme") %>% pull(AGED))
 fonction_de_stat_agregee(df %>% filter(SEXE == "Femme") %>% pull(AGED))
 
 
-# STATISTIQUES AGREGEES ---------------------------------------
+# PYRAMIDE AGES =============================
 
-
-df %>%
+pyramide_ages <- df %>%
   group_by(AGED) %>%
   summarise(n = sum(IPONDI))
-
-
-# STATS MODALITES DE TRANSPORT 
-df3 <- df %>%
-  group_by(COUPLE, TRANS) %>%
-  summarise(x = sum(IPONDI)) %>%
-  group_by(COUPLE) %>%
-  mutate(y = 100 * x / sum(x))
-
-
-# FIGURES ----------------------------------------------------
-
 
 ggplot(df) +
   geom_histogram(
     aes(x = 5 * floor(as.numeric(AGED) / 5), weight = IPONDI),
     stat = "count"
   )
+
+
+# STATS MODALITES DE TRANSPORT ===============
+
+transport_par_statut_couple <- df %>%
+  group_by(COUPLE, TRANS) %>%
+  summarise(x = sum(IPONDI)) %>%
+  group_by(COUPLE) %>%
+  mutate(y = 100 * x / sum(x))
+transport_par_statut_couple
+
+# PART HOMMES DANS CHAQUE COHORTE ============================
 
 
 part_hommes_chaque_cohorte <- df %>%
@@ -84,7 +87,7 @@ part_hommes_chaque_cohorte <- df %>%
   filter(SEXE == "Homme")
 
 
-ggplot(part_hommes_chaque_cohorte) +
+p <- ggplot(part_hommes_chaque_cohorte) +
   geom_bar(aes(x = AGED, y = SH_sexe), stat = "identity") +
   geom_point(aes(x = AGED, y = SH_sexe), stat = "identity", color = "red") +
   coord_cartesian(c(0, 100))
@@ -98,7 +101,7 @@ ggsave("p.png", p)
 data_modelisation <- df %>%
   filter(SURF != "Z") %>%
   mutate(SURF = factor(SURF, ordered = TRUE)) %>%
-  filter(COUPLE == 2 & between(AGED, 40, 60)) %>%
+  filter(between(AGED, 40, 60)) %>%
   sample_n(1000)
 
 
