@@ -39,6 +39,7 @@ df <- df %>% mutate(SEXE = as.character(SEXE)) %>%
 
 p <- # part d'homme dans chaque cohort
   df %>% 
+  select(AGED, SEXE, IPONDI) %>%
   group_by(AGED, SEXE) %>% 
   summarise(SH_sexe = sum(IPONDI)) %>% 
   group_by(AGED) %>% 
